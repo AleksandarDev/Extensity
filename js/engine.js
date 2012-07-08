@@ -11,7 +11,7 @@ Extensity = function() {
 
 // Relevant URLs
 Extensity.prototype.pages = {
-	rate			: 'https://chrome.google.com/webstore/detail/jjmflmamggggndanpgfnpelongoepncg',
+	rate		: 'https://chrome.google.com/webstore/detail/jjmflmamggggndanpgfnpelongoepncg',
 	twitter		: 'http://twitter.com/share?url=https://chrome.google.com/webstore/detail/jjmflmamggggndanpgfnpelongoepncg&via=ExtensityChrome&text=Keep control of your Chrome extensions with Extensity. Quickly enable/disable any extension!',
 	extensions 	: 'chrome://extensions/',
 	options		: 'options.html'
@@ -20,10 +20,10 @@ Extensity.prototype.pages = {
 // jQuery selectors
 Extensity.prototype.selectors = {
 	header			:	'#header',
-	list				: 	'#content #list',
+	list			: 	'#content #list',
 	trigger			: 	'.extension-trigger',
 	triggerElements	: 	'img,span',
-	rate				:	'img:#rate',
+	rate			:	'img:#rate',
 	twitter			:	'img:#twitter',	
 	extensions		:	'img:#extensions',
 	options			:	'img:#options',	
@@ -63,9 +63,9 @@ Extensity.prototype.start = function() {
 // Reload the extensions list
 Extensity.prototype.reload = function(callback) {
 	var self = this;
-	chrome.management.getAll(function(results) {
+	chrome.management.getAll(function (results) {
 		self.cache.extensions = results;
-		
+
 		// Sort the extensions list 
 		self.cache.extensions.sort(function(a,b) {
 			if(self.cache.options.groupApps)
@@ -109,25 +109,46 @@ Extensity.prototype.refreshList = function() {
 };
 
 // Add an item to the list
-Extensity.prototype.addListItem = function(item) {
+Extensity.prototype.addListItem = function (item) {
 	var self = this;
-	$((item.isApp)?self.templates.extensionItem:self.templates.appItem)
-		.tmpl({
-			item: item, 
-			options: {
-				icon: self.getSmallestIconUrl(item.icons),
-				statusClass: (item.enabled) ? self.classes.enabled : self.classes.disabled
-			}
-		})
-		.appendTo(self.selectors.list);			
+
+	// Create empty element
+	var newAppItem = $(
+		"<a class='extension-item extension-trigger' href='#'>\
+			<img width='16' height='16' />\
+			<span>${item.name}</span>\
+			<img width='16' height='16' src='images/reload.png' style='float: right; display:none;' />\
+		</a>");
+
+	// Populate element
+	newAppItem.attr("id", item.id);
+	newAppItem.addClass((item.enabled) ? self.classes.enabled : self.classes.disabled);
+	$("img:nth-child(1)", newAppItem).attr("src", self.getSmallestIconUrl(item.icons));
+	$("span", newAppItem).text(item.name);
+	if (!item.isApp &&
+		self.cache.options.reloadInsteadOfToggle) {
+		$(":nth-child(3)", newAppItem).css("display", "block");
+	}
+
+	// Append element to list
+	newAppItem.appendTo(self.selectors.list);	
 };
 
 //Add an section header to the list
 Extensity.prototype.addListSection = function(item) {
 	var self = this;
-	$(self.templates.section)
-		.tmpl({section: self.getListSectionName(item)})
-		.appendTo(self.selectors.list);
+
+	// Create empty element
+	var newSection = $(
+		"<div class='extension-section'>\
+			<span></span>\
+		</div>");
+
+	// Populate element
+	$("span", newSection).text(self.getListSectionName(item));
+
+	// Append element to list
+	newSection.appendTo(self.selectors.list);
 };
 
 
@@ -268,10 +289,18 @@ Extensity.prototype.triggerExtension = function (id) {
 // Set the enabled/disabled status of an extension
 Extensity.prototype.toggleExtension = function (id, status) {
 	var self = this;
-	chrome.management.setEnabled(id, status, function() {
-		self.reload(function() { 
-			self.refreshList(); 
-		});	
+	chrome.management.setEnabled(id, status, function () {
+		// Toggle extension again if current state is disabled
+		// and reload option is enabled
+		if (self.cache.options.reloadInsteadOfToggle &&
+			status == false) {
+			self.toggleExtension(id, !status);
+		}
+		else {
+			self.reload(function () {
+				self.refreshList();
+			});
+		}
 	});	
 };
 
